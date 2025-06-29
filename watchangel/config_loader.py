@@ -8,7 +8,7 @@ def load_lines(filename: str) -> List[str]:
     """
     Lädt Zeilen aus einer Textdatei im config/-Verzeichnis.
 
-    :param filename: Dateiname (z. B. "block_keywords.txt")
+    :param filename: Dateiname (z.B. "block_keywords.txt")
     :return: Liste von Zeilen, jeweils getrimmt
     """
     path = CONFIG_DIR / filename

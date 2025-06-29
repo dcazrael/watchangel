@@ -9,6 +9,7 @@ dependencies = [
   "imagehash",
   "requests",
   "pytest",
+  "langdetect",
 ]
 [tool.setuptools]
 packages = ["watchangel"]
