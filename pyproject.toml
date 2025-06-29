@@ -1,0 +1,14 @@
+[project]
+name = "watchangel"
+version = "0.1.0"
+description = "Automatischer Watch-History-Filter für YouTube"
+requires-python = ">=3.9"
+dependencies = [
+  "selenium",
+  "pillow",
+  "imagehash",
+  "requests",
+  "pytest",
+]
+[tool.setuptools]
+packages = ["watchangel"]
