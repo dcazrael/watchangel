@@ -1,11 +1,9 @@
-import json
 import time
-from pathlib import Path
 from selenium.webdriver.chrome.webdriver import WebDriver
-from .video_scraper import get_all_history_videos
+from .video_scraper import get_all_history_videos, get_recent_history_videos
 from .video_checker import is_video_blockworthy
 from .video_handler import handle_suspicious_video
-from ..history.cleaner import remove_all_from_channel
+from watchangel.cleaner.cleaner import remove_all_from_channel
 from ..rules.block_rules import BlockRuleEngine
 
 SEEN_VIDEO_IDS: set[str] = set()
@@ -23,10 +21,11 @@ def check_history_once(driver: WebDriver) -> None:
     time.sleep(3)
 
     print("[⏳] Lese Videos aus Verlauf...")
-    videos = get_all_history_videos(driver)
+    # Nur oberste Videos prüfen – ältere sind bereits bereinigt
+    videos = get_recent_history_videos(driver)
 
     engine = BlockRuleEngine.from_logs()
-    already_blocked = engine.blocked_channels  # ⬅️ bereinigt um undo_channels
+    already_blocked = engine.block_channels
 
     for video in videos:
         video_id = video["video_id"]

@@ -10,3 +10,5 @@ CSS_SELECTORS = {
     "submit_button": "#confirm-button button[aria-label='Submit']",
     "done_button": "#done-button button[aria-label='Done']",
 }
+
+COMMON_MISDETECTIONS_FOR_ENGLISH = {"so", "tl", "zu", "cy", "id"}

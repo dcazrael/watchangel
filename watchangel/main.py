@@ -1,29 +1,17 @@
 import argparse
-import time
 from pathlib import Path
 from selenium import webdriver
 from selenium.webdriver.chrome.webdriver import WebDriver
 
-from watchangel.history.cleaner import clean_blocked_channels_from_history
 from watchangel.rules.undo_handler import apply_undo_channels_from_log
-from watchangel.watcher.watch_loop import check_history_once
+from watchangel.run.watch_loop_run import run_watch_loop
+from watchangel.run.main_clean_run import run_cleanup_pipeline
 
 
 def create_driver(profile_dir: Path) -> WebDriver:
     options = webdriver.ChromeOptions()
     options.add_argument(f"user-data-dir={str(profile_dir)}")
     return webdriver.Chrome(options=options)
-
-
-def run_watch_loop(driver: WebDriver) -> None:
-    try:
-        while True:
-            check_history_once(driver)
-            time.sleep(0.5)
-    except KeyboardInterrupt:
-        print("\n[⛔️] Manuell beendet")
-    finally:
-        driver.quit()
 
 
 def main() -> None:
@@ -37,12 +25,11 @@ def main() -> None:
 
     apply_undo_channels_from_log(driver)
 
-    if args.cleanup:
-        clean_blocked_channels_from_history(driver)
-        driver.quit()
-        return
+    deleted = run_cleanup_pipeline(driver)
+    print(f"[🧼] Insgesamt {deleted} Video(s) bereinigt.")
 
     run_watch_loop(driver)
+    driver.quit()
 
 
 if __name__ == "__main__":

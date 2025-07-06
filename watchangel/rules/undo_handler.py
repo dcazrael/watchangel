@@ -1,8 +1,8 @@
 from selenium.webdriver.chrome.webdriver import WebDriver
-from pathlib import Path
 import json
 
 from watchangel.blocker.actions import unhide_user_from_channel
+from watchangel.utils.paths import log_path, undo_path
 
 
 def apply_undo_channels_from_log(driver: WebDriver) -> None:
@@ -10,9 +10,6 @@ def apply_undo_channels_from_log(driver: WebDriver) -> None:
     Entsperrt Kanäle aus 'undo_block_channels.txt', sofern sie im Log existieren.
     Erfolgreiche Entsperrung → Logeintrag aus 'blocked_channels.log' entfernen.
     """
-    root = Path(__file__).parent.parent.parent
-    log_path = root / "blocked_channels.log"
-    undo_path = root / "config" / "undo_block_channels.txt"
 
     if not log_path.exists() or not undo_path.exists():
         return

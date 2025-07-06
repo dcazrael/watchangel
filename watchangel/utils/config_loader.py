@@ -1,7 +1,6 @@
-from pathlib import Path
 from typing import List
 
-CONFIG_DIR = Path(__file__).parent.parent / "config"
+from watchangel.utils.paths import CONFIG_DIR
 
 
 def load_lines(filename: str) -> List[str]:

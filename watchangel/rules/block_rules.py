@@ -1,12 +1,13 @@
 import json
 import re
 from dataclasses import dataclass
-from pathlib import Path
 from typing import ClassVar, Iterable, Optional
 
 from langdetect import detect, LangDetectException
 
-from watchangel.config_loader import load_lines
+from watchangel.blocker.constants import COMMON_MISDETECTIONS_FOR_ENGLISH
+from watchangel.utils.config_loader import load_lines
+from watchangel.utils.paths import log_path, wl_path, wl_patterns_path, undo_path
 from watchangel.globals import VERBOSE
 
 EMOJI_PATTERN = re.compile(r"[\U00010000-\U0010ffff]", flags=re.UNICODE)
@@ -27,18 +28,18 @@ class BlockRuleEngine:
     _instance: ClassVar[Optional["BlockRuleEngine"]] = None
 
     def __init__(
-        self,
-        keywords: Iterable[str],
-        phrases: Iterable[str],
-        blocked_channels: Iterable[str],
-        whitelist_channels: Iterable[str] = (),
-        whitelist_patterns: Iterable[str] = (),
-        undo_channels: Iterable[str] = (),
-        allowed_languages: Iterable[str] = ("de", "en", "ja"),
+            self,
+            keywords: Iterable[str],
+            phrases: Iterable[str],
+            block_channels: Iterable[str],
+            whitelist_channels: Iterable[str] = (),
+            whitelist_patterns: Iterable[str] = (),
+            undo_channels: Iterable[str] = (),
+            allowed_languages: Iterable[str] = ("de", "en", "ja"),
     ) -> None:
         self.keywords = {kw.lower() for kw in keywords}
         self.phrases = {ph.lower() for ph in phrases}
-        self.blocked_channels = {ch.lower() for ch in blocked_channels}
+        self.block_channels = {ch.lower() for ch in block_channels}
         self.whitelist_channels = {wl.lower() for wl in whitelist_channels}
         self.whitelist_patterns = [p.lower() for p in whitelist_patterns]
         self.undo_channels = {uc.lower() for uc in undo_channels}
@@ -52,7 +53,7 @@ class BlockRuleEngine:
         return cls(
             keywords=load_lines("block_keywords.txt"),
             phrases=load_lines("block_phrases.txt"),
-            blocked_channels=load_lines("block_channels.txt"),
+            block_channels=load_lines("block_channels.txt"),
             whitelist_channels=load_lines("whitelist_channels.txt"),
             whitelist_patterns=load_lines("whitelist_patterns.txt"),
             undo_channels=load_lines("undo_block_channels.txt"),
@@ -61,11 +62,6 @@ class BlockRuleEngine:
     @classmethod
     def from_logs(cls, verbose: bool = VERBOSE) -> "BlockRuleEngine":
         """Erstellt Instanz aus Logdatei, Whitelist und Undo-Liste."""
-        PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-        log_path = PROJECT_ROOT / "blocked_channels.log"
-        wl_path = PROJECT_ROOT / "whitelist_channels.txt"
-        wl_patterns_path = PROJECT_ROOT / "whitelist_patterns.txt"
-        undo_path = PROJECT_ROOT / "undo_block_channels.txt"
 
         blocked, whitelist, wl_patterns, undo = [], [], [], []
 
@@ -111,7 +107,7 @@ class BlockRuleEngine:
         return cls(
             keywords=[],
             phrases=[],
-            blocked_channels=blocked,
+            block_channels=blocked,
             whitelist_channels=whitelist,
             whitelist_patterns=wl_patterns,
             undo_channels=undo,
@@ -119,16 +115,20 @@ class BlockRuleEngine:
 
     # ------------------- Hauptlogik -------------------
 
-    def is_blockworthy(self, title: str, channel_name: str) -> bool:
+    def is_blockworthy(self, title: str, channel_name: str, video_url: str = "") -> bool:
         """Gibt zurück, ob das Video blockiert werden soll."""
-        return self.explain_block_decision(title, channel_name).block
+        return self.explain_block_decision(title, channel_name, video_url).block
 
-    def explain_block_decision(self, title: str, channel_name: str) -> BlockDecision:
+    def explain_block_decision(self, title: str, channel_name: str, video_url: str = "") -> BlockDecision:
         """
         Liefert eine Entscheidung samt Begründung, warum ein Video blockiert wurde.
         """
         name = channel_name.strip().lower()
         lower_title = title.strip().lower()
+
+        # 0. Mix-Video
+        if video_url and self.is_mix(title, video_url):
+            return BlockDecision(True, "Mix-Video erkannt")
 
         # 1. Whitelist-Kanalname (genau)
         if name in self.whitelist_channels:
@@ -156,7 +156,7 @@ class BlockRuleEngine:
             return BlockDecision(True, "unsupported title language")
 
         # 6. Blockliste
-        if name in self.blocked_channels:
+        if name in self.block_channels:
             return BlockDecision(True, "explicitly blocked channel")
 
         # 7. Keywords/Phrasen im Titel
@@ -176,11 +176,6 @@ class BlockRuleEngine:
         return any("\u0600" <= ch <= "\u06FF" or "\u0750" <= ch <= "\u077F" for ch in text)
 
     def is_unsupported_language(self, text: str) -> bool:
-        """
-        Prüft, ob die Sprache des Textes nicht zu den erlaubten zählt.
-        Emojis und andere Störungen werden entfernt.
-        Texte mit zu wenig Inhalt werden nicht blockiert.
-        """
         cleaned = self.strip_emojis(text)
         words = cleaned.split()
         letters_only = ''.join(c for c in cleaned if c.isalpha())
@@ -192,9 +187,28 @@ class BlockRuleEngine:
             lang = detect(cleaned)
             if VERBOSE:
                 print(f"[🧪] Language detected: {lang} ← {cleaned!r}")
+            # Wenn fälschlich Somali etc. erkannt wurde, als Englisch behandeln
+            if lang in COMMON_MISDETECTIONS_FOR_ENGLISH and "a" in cleaned.lower():
+                lang = "en"
             return lang not in self.allowed_languages
         except LangDetectException:
             return self.is_arabic(text)
+
+    def is_mix(self, title: str, video_url: str) -> bool:
+        """
+        Erkennt YouTube-Mix-Videos anhand von URL oder Titelstruktur.
+        """
+        title_lc = title.lower()
+        return (
+                "mix" in title_lc
+                or "automix" in title_lc
+                or "playlist" in title_lc
+                or "best of" in title_lc
+                or "youTube mix" in title_lc
+                or "list=rd" in video_url.lower()
+                or "list=ul" in video_url.lower()
+                or "/mix/" in video_url.lower()
+        )
 
     @staticmethod
     def strip_emojis(text: str) -> str:

@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from watchangel import analyzer
+from watchangel.analysis import analyzer
 from unittest.mock import patch, MagicMock
 
 

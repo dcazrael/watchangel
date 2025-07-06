@@ -4,9 +4,10 @@ import time
 from pathlib import Path
 from selenium.webdriver.chrome.webdriver import WebDriver
 
-from watchangel.analyzer import save_thumbnail
+from watchangel.analysis.analyzer import save_thumbnail, extract_video_id
 from watchangel.blocker.actions import block_channel
-from watchangel.history.cleaner import remove_all_from_channel
+from watchangel.utils.paths import log_path
+from watchangel.cleaner.cleaner import remove_all_from_channel
 
 THUMBNAIL_DIR = Path(__file__).parent.parent.parent / "thumbnails"
 LOG_PATH = Path(__file__).parent.parent.parent / "blocked_channels.log"
@@ -14,7 +15,7 @@ THUMBNAIL_DIR.mkdir(exist_ok=True)
 
 
 def handle_suspicious_video(driver: WebDriver, video: dict) -> None:
-    video_id = video["video_id"]
+    video_id = extract_video_id(video["video_id"])
     title = video["title"]
     channel_name = video["channel_name"]
 
@@ -33,7 +34,6 @@ def handle_suspicious_video(driver: WebDriver, video: dict) -> None:
 
 
 def log_block_action(video: dict) -> None:
-    log_path = LOG_PATH
     with open(log_path, "a", encoding="utf-8") as f:
         f.write(json.dumps({
             "channel_name": video["channel_name"],

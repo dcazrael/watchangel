@@ -1,6 +1,5 @@
 import pytest
-from watchangel import config_loader
-from pathlib import Path
+from watchangel.utils import config_loader
 
 CONFIG_FILE = "block_keywords.txt"
 

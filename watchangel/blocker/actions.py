@@ -102,11 +102,14 @@ def handle_block_kids(driver: WebDriver, item) -> bool:
         return False
 
 
-def handle_hide_user(driver: WebDriver, item) -> bool:
+def handle_hide_user(driver: WebDriver, item, unhide: bool = False) -> bool:
     label = item.text.strip().lower()
-    if "unhide user from my channel" in label:
-        print("[ℹ️] Bereits versteckt – UNHIDE vorhanden, kein Klick nötig")
-        return True
+    if "unhide user from my channel" in label and not unhide:
+            print("[ℹ️] Bereits versteckt – UNHIDE vorhanden, kein Klick nötig")
+            return True
+    elif not "unhide user from my channel" in label and unhide:
+        print("[ℹ️] Kein Unhide notwendig – Nutzer war nicht blockiert")
+        return False
 
     item.click()
     try:
@@ -144,30 +147,13 @@ def unhide_user_from_channel(driver: WebDriver, channel_url: str) -> bool:
         print("[❌] About-Modal ist nicht erschienen")
         return False
 
+    is_unhidden = False
     try:
         open_report_menu(driver)
         menu_items = get_report_menu_items(driver)
         for item in menu_items:
-            text = item.text.strip().lower()
-            if "unhide user from my channel" in text:
-                item.click()
-                print("[🔓] Unhide ausgeführt")
-                time.sleep(1)
-                try:
-                    print("[🧪] Klicke auf Submit-Button...")
-                    submit_button = WebDriverWait(driver, 5).until(
-                        EC.element_to_be_clickable(
-                            (By.CSS_SELECTOR, CSS_SELECTORS["submit_button"])
-                        )
-                    )
-                    submit_button.click()
-                    print("[✅] Submit ausgeführt")
-                    return True
-                except TimeoutException:
-                    print("[⚠️] Submit nicht geklickt")
-                    return False
-        print("[ℹ️] Kein Unhide notwendig – Nutzer war nicht blockiert")
-        return True
+            is_unhidden = handle_hide_user(driver, item, unhide=True)
+        return True if is_unhidden else False
     except Exception as e:
         print(f"[❌] Fehler beim Unhide: {e}")
         return False
